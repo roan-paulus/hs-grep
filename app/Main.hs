@@ -17,7 +17,8 @@ main = do
             files <- getFiles config'.filepaths
             let result = map (search config'.pattern . fileContents) files
             case head result of
-                Just r -> putStrLn $ show (r.lineNumber + 1) ++ "," ++ show (r.columnNumber + 1) ++ " :: " ++ Ansi.red r.lineContent
+                Just r -> do
+                    putStrLn $ formatSearchResult r
                 Nothing -> putStrLn "Nothing found"
         Nothing -> do
             putStrLn "Config could not be made"
@@ -26,6 +27,18 @@ main = do
 type FileContents = String
 
 data FileBundle = FileBundle {filepath :: FilePath, fileContents :: FileContents}
+
+formatSearchResult :: SearchResult -> String
+formatSearchResult result =
+    show (result.lineNumber + 1) ++ "," ++ show (result.match.startIndex + 1) ++ " :: " ++ formattedLine
+  where
+    formattedLine =
+        let start = result.match.startIndex
+            end = result.match.endIndex
+            beforeMatch = take start result.lineContent
+            matchedWord = take (end - start + 1) $ drop start result.lineContent
+            afterMatch = drop (end + 1) result.lineContent
+         in beforeMatch ++ Ansi.red matchedWord ++ afterMatch
 
 getFiles :: [FilePath] -> IO [FileBundle]
 getFiles [] = pure []
@@ -38,7 +51,8 @@ getFiles (path : rest) = do
         Right contents -> do
             (FileBundle{filepath = path, fileContents = contents} :) <$> getFiles rest
 
-data SearchResult = SearchResult {lineContent :: String, lineNumber :: Int, columnNumber :: Int}
+data SearchResult = SearchResult {lineContent :: String, lineNumber :: Int, match :: Slice}
+data Slice = Slice {startIndex :: Int, endIndex :: Int}
 
 type QueryString = String
 
@@ -48,16 +62,19 @@ search query fileContents' = searchLines $ zip [0 ..] $ lines fileContents'
     searchLines [] = Nothing
     searchLines ((i, line) : rest) =
         case searchSubString line query of
-            Just foundColumnNumber -> Just SearchResult{lineContent = line, lineNumber = i, columnNumber = foundColumnNumber}
+            Just slice -> Just SearchResult{lineContent = line, lineNumber = i, match = slice}
             Nothing -> searchLines rest
 
-searchSubString :: String -> QueryString -> Maybe Int
+--- Try to find a substring and return the start and end indexes.
+searchSubString :: String -> QueryString -> Maybe Slice
 searchSubString _ [] = Nothing
 searchSubString text query = go $ zip [0 ..] text
   where
     go [] = Nothing
     go ((index, char) : chars)
         | char == head query
-            && char : take (length query - 1) (map snd chars) == query =
-            Just index
+            && char : take (queryLength - 1) (map snd chars) == query =
+            Just (Slice{startIndex = index, endIndex = index + queryLength - 1})
         | otherwise = go chars
+      where
+        queryLength = length query
