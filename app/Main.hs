@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Main where
@@ -30,16 +31,36 @@ data FileBundle = FileBundle {filepath :: FilePath, fileContents :: FileContents
 -- Take a search result and return a formatted version of the line with the match highlighted within it.
 formatSearchResult :: SearchResult -> String
 formatSearchResult result =
-    show (result.lineNumber + 1) ++ "," ++ show (firstMatch.startIndex + 1) ++ " :: " ++ formattedLine
+    show (result.lineNumber + 1) ++ "," ++ show (firstMatch.startIndex + 1) ++ " :: " ++ formattedLine result
   where
     firstMatch = head result.matches
-    formattedLine =
-        let start = firstMatch.startIndex
-            end = firstMatch.endIndex
-            beforeMatch = take start result.lineContent
-            matchedWord = take (end - start + 1) $ drop start result.lineContent
-            afterMatch = drop (end + 1) result.lineContent
-         in beforeMatch ++ Ansi.red matchedWord ++ afterMatch
+
+formattedLine :: SearchResult -> String
+formattedLine (SearchResult{lineContent, matches = []}) = lineContent
+formattedLine (SearchResult{lineContent, lineNumber, matches = (match : remainingMatches)}) =
+    let start = match.startIndex
+        end = match.endIndex
+        beforeMatch = take start lineContent
+        matchedWord = take (end - start + 1) $ drop start lineContent
+        afterMatch = drop (end + 1) lineContent
+        deletedSliceLength = length beforeMatch + length matchedWord
+        offsettedRemaningMatches =
+            map
+                ( \m ->
+                    Slice
+                        { startIndex = m.startIndex - deletedSliceLength
+                        , endIndex = m.endIndex - deletedSliceLength
+                        }
+                )
+                remainingMatches
+     in beforeMatch
+            ++ Ansi.red matchedWord
+            ++ formattedLine
+                SearchResult
+                    { lineContent = afterMatch
+                    , lineNumber = lineNumber -- TODO: Useless data to keep around.
+                    , matches = offsettedRemaningMatches
+                    }
 
 getFiles :: [FilePath] -> IO [FileBundle]
 getFiles [] = pure []
