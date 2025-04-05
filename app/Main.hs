@@ -15,11 +15,10 @@ main = do
     case config of
         Just config' -> do
             files <- getFiles config'.filepaths
-            let result = map (search config'.pattern . fileContents) files
-            case head result of
-                Just r -> do
-                    putStrLn $ formatSearchResult r
-                Nothing -> putStrLn "Nothing found"
+            let searchResults = concatMap (search config'.pattern . fileContents) files
+            if null searchResults
+                then putStrLn "No matches found."
+                else mapM_ (putStrLn . formatSearchResult) searchResults
         Nothing -> do
             putStrLn "Config could not be made"
             putStrLn Constants.helpMsg
@@ -28,13 +27,15 @@ type FileContents = String
 
 data FileBundle = FileBundle {filepath :: FilePath, fileContents :: FileContents}
 
+-- Take a search result and return a formatted version of the line with the match highlighted within it.
 formatSearchResult :: SearchResult -> String
 formatSearchResult result =
-    show (result.lineNumber + 1) ++ "," ++ show (result.match.startIndex + 1) ++ " :: " ++ formattedLine
+    show (result.lineNumber + 1) ++ "," ++ show (firstMatch.startIndex + 1) ++ " :: " ++ formattedLine
   where
+    firstMatch = head result.matches
     formattedLine =
-        let start = result.match.startIndex
-            end = result.match.endIndex
+        let start = firstMatch.startIndex
+            end = firstMatch.endIndex
             beforeMatch = take start result.lineContent
             matchedWord = take (end - start + 1) $ drop start result.lineContent
             afterMatch = drop (end + 1) result.lineContent
@@ -51,30 +52,33 @@ getFiles (path : rest) = do
         Right contents -> do
             (FileBundle{filepath = path, fileContents = contents} :) <$> getFiles rest
 
-data SearchResult = SearchResult {lineContent :: String, lineNumber :: Int, match :: Slice}
+data SearchResult = SearchResult {lineContent :: String, lineNumber :: Int, matches :: [Slice]}
 data Slice = Slice {startIndex :: Int, endIndex :: Int}
 
 type QueryString = String
 
-search :: QueryString -> FileContents -> Maybe SearchResult
+search :: QueryString -> FileContents -> [SearchResult]
 search query fileContents' = searchLines $ zip [0 ..] $ lines fileContents'
   where
-    searchLines [] = Nothing
-    searchLines ((i, line) : rest) =
-        case searchSubString line query of
-            Just slice -> Just SearchResult{lineContent = line, lineNumber = i, match = slice}
-            Nothing -> searchLines rest
+    searchLines [] = []
+    searchLines ((i, line) : rest)
+        | (not . null) matches' =
+            SearchResult{lineContent = line, lineNumber = i, matches = matches'} : searchLines rest
+        | otherwise = searchLines rest
+      where
+        matches' = searchSubString line query
 
 --- Try to find a substring and return the start and end indexes.
-searchSubString :: String -> QueryString -> Maybe Slice
-searchSubString _ [] = Nothing
+searchSubString :: String -> QueryString -> [Slice]
+searchSubString _ [] = []
 searchSubString text query = go $ zip [0 ..] text
   where
-    go [] = Nothing
+    go [] = []
     go ((index, char) : chars)
         | char == head query
-            && char : take (queryLength - 1) (map snd chars) == query =
-            Just (Slice{startIndex = index, endIndex = index + queryLength - 1})
+            && isMatch =
+            Slice{startIndex = index, endIndex = index + queryLength - 1} : go chars
         | otherwise = go chars
       where
+        isMatch = char : take (queryLength - 1) (map snd chars) == query
         queryLength = length query
