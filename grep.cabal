@@ -24,6 +24,7 @@ executable grep
                     , Ansi
                     , Search
                     , Types
+                    , Format
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
