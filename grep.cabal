@@ -22,6 +22,8 @@ executable grep
     other-modules:    Constants
                     , Parse
                     , Ansi
+                    , Search
+                    , Types
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:

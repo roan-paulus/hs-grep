@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
@@ -8,7 +9,9 @@ import qualified Constants (helpMsg)
 import Control.Exception (SomeException, try)
 import Parse (Config (..))
 import qualified Parse
+import Search
 import qualified System.Environment as Env
+import Types (FileBundle (..))
 
 main :: IO ()
 main = do
@@ -16,17 +19,13 @@ main = do
     case config of
         Just config' -> do
             files <- getFiles config'.filepaths
-            let searchResults = concatMap (search config'.pattern . fileContents) files
+            let searchResults = concatMap (search config'.pattern) files
             if null searchResults
                 then putStrLn "No matches found."
                 else mapM_ (putStrLn . formatSearchResult) searchResults
         Nothing -> do
             putStrLn "Config could not be made"
             putStrLn Constants.helpMsg
-
-type FileContents = String
-
-data FileBundle = FileBundle {filepath :: FilePath, fileContents :: FileContents}
 
 -- Take a search result and return a formatted version of the line with the match highlighted within it.
 formatSearchResult :: SearchResult -> String
@@ -37,7 +36,7 @@ formatSearchResult result =
 
 formattedLine :: SearchResult -> String
 formattedLine (SearchResult{lineContent, matches = []}) = lineContent
-formattedLine (SearchResult{lineContent, lineNumber, matches = (match : remainingMatches)}) =
+formattedLine (SearchResult{path, lineContent, lineNumber, matches = (match : remainingMatches)}) =
     let start = match.startIndex
         end = match.endIndex
         beforeMatch = take start lineContent
@@ -57,12 +56,13 @@ formattedLine (SearchResult{lineContent, lineNumber, matches = (match : remainin
             ++ Ansi.red matchedWord
             ++ formattedLine
                 SearchResult
-                    { lineContent = afterMatch
+                    { path
+                    , lineContent = afterMatch
                     , lineNumber = lineNumber -- TODO: Useless data to keep around.
                     , matches = offsettedRemaningMatches
                     }
 
-getFiles :: [FilePath] -> IO [FileBundle]
+getFiles :: [FilePath] -> IO [Types.FileBundle]
 getFiles [] = pure []
 getFiles (path : rest) = do
     result <- try $ readFile path :: IO (Either SomeException String)
@@ -71,35 +71,4 @@ getFiles (path : rest) = do
             putStrLn $ "Caught exception: " ++ show ex
             getFiles rest
         Right contents -> do
-            (FileBundle{filepath = path, fileContents = contents} :) <$> getFiles rest
-
-data SearchResult = SearchResult {lineContent :: String, lineNumber :: Int, matches :: [Slice]}
-data Slice = Slice {startIndex :: Int, endIndex :: Int}
-
-type QueryString = String
-
-search :: QueryString -> FileContents -> [SearchResult]
-search query fileContents' = searchLines $ zip [0 ..] $ lines fileContents'
-  where
-    searchLines [] = []
-    searchLines ((i, line) : rest)
-        | (not . null) matches' =
-            SearchResult{lineContent = line, lineNumber = i, matches = matches'} : searchLines rest
-        | otherwise = searchLines rest
-      where
-        matches' = searchSubString line query
-
---- Try to find a substring and return the start and end indexes.
-searchSubString :: String -> QueryString -> [Slice]
-searchSubString _ [] = []
-searchSubString text query = go $ zip [0 ..] text
-  where
-    go [] = []
-    go ((index, char) : chars)
-        | char == head query
-            && isMatch =
-            Slice{startIndex = index, endIndex = index + queryLength - 1} : go chars
-        | otherwise = go chars
-      where
-        isMatch = char : take (queryLength - 1) (map snd chars) == query
-        queryLength = length query
+            (FileBundle{path, contents = contents} :) <$> getFiles rest
