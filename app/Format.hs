@@ -1,9 +1,6 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-
 module Format (formatSearchResult) where
 
-import qualified Ansi (red)
+import Ansi qualified (red)
 import Search
 
 -- Take a search result and return a formatted version of the line with the match highlighted within it.

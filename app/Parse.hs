@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
 module Parse (parseArgs, Config (..), Option (..)) where
 
 data Config = Config

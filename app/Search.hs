@@ -1,9 +1,8 @@
-{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Search (SearchResult (..), Slice (..), search) where
 
-import qualified Types (FileBundle (..))
+import Types qualified (FileBundle (..))
 
 data SearchResult = SearchResult {path :: String, lineContent :: String, lineNumber :: Int, matches :: [Slice]}
 data Slice = Slice {startIndex :: Int, endIndex :: Int}

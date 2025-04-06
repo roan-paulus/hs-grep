@@ -26,10 +26,11 @@ executable grep
                     , Types
                     , Format
 
-    -- LANGUAGE extensions used by modules in this package.
-    -- other-extensions:
+    default-extensions: NamedFieldPuns
+                    , OverloadedRecordDot
+                    , DuplicateRecordFields
     build-depends:    base ^>=4.17.2.1
                     , mtl ^>=2.2.2
 
     hs-source-dirs:   app
-    default-language: Haskell2010
+    default-language: GHC2021

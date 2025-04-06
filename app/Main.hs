@@ -1,16 +1,12 @@
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-
 module Main where
 
-import qualified Constants (helpMsg)
+import Constants qualified (helpMsg)
 import Control.Exception (SomeException, try)
-import qualified Format
+import Format qualified 
 import Parse (Config (..))
-import qualified Parse
+import Parse qualified 
 import Search
-import qualified System.Environment as Env
+import System.Environment qualified  as Env 
 import Types (FileBundle (..))
 
 main :: IO ()
