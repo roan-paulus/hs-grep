@@ -18,7 +18,8 @@ main = do
             let searchResults = concatMap (search config'.pattern) files
             if null searchResults
                 then putStrLn "No matches found."
-                else mapM_ (putStrLn . Format.formatSearchResult) searchResults
+                else do
+                    mapM_ (putStrLn . Format.formatSearchResult config'.options) searchResults
         Nothing -> do
             putStrLn "Config could not be made"
             putStrLn Constants.helpMsg

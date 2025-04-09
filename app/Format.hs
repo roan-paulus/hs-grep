@@ -2,17 +2,26 @@ module Format (formatSearchResult) where
 
 import Ansi qualified (red)
 import Search
+import Parse (Options(..))
 
 -- Take a search result and return a formatted version of the line with the match highlighted within it.
-formatSearchResult :: SearchResult -> String
-formatSearchResult result =
-    show (result.lineNumber + 1) ++ "," ++ show (firstMatch.startIndex + 1) ++ " :: " ++ formattedLine result
-  where
-    firstMatch = head result.matches
+formatSearchResult :: Options -> SearchResult -> String
+formatSearchResult options result
+    | options.highlightMatches = start ++ colorMatches result
+    | otherwise = start ++ result.lineContent
+    where
+        start = 
+            result.path
+            ++ ":"
+            ++ show (result.lineNumber + 1)
+            ++ ","
+            ++ show (firstMatch.startIndex + 1)
+            ++ " :: "
+        firstMatch = head result.matches
 
-formattedLine :: SearchResult -> String
-formattedLine (SearchResult{lineContent, matches = []}) = lineContent
-formattedLine (SearchResult{path, lineContent, lineNumber, matches = (match : remainingMatches)}) =
+colorMatches :: SearchResult -> String
+colorMatches (SearchResult{lineContent, matches = []}) = lineContent
+colorMatches (SearchResult{path, lineContent, lineNumber, matches = (match : remainingMatches)}) =
     let start = match.startIndex
         end = match.endIndex
         beforeMatch = take start lineContent
@@ -30,7 +39,7 @@ formattedLine (SearchResult{path, lineContent, lineNumber, matches = (match : re
                 remainingMatches
      in beforeMatch
             ++ Ansi.red matchedWord
-            ++ formattedLine
+            ++ colorMatches
                 SearchResult
                     { path
                     , lineContent = afterMatch
